@@ -6,6 +6,7 @@ import {
   users,
   modules,
   lessons,
+  courseRatings,
   CourseStatus,
 } from "~/db/schema";
 
@@ -88,6 +89,8 @@ export function buildCourseQuery(
       instructorName: users.name,
       instructorAvatarUrl: users.avatarUrl,
       categoryName: categories.name,
+      averageRating: sql<number | null>`(SELECT AVG(${courseRatings.rating}) FROM ${courseRatings} WHERE ${courseRatings.courseId} = ${courses.id})`,
+      ratingCount: sql<number>`(SELECT COUNT(*) FROM ${courseRatings} WHERE ${courseRatings.courseId} = ${courses.id})`,
     })
     .from(courses)
     .innerJoin(users, eq(courses.instructorId, users.id))
@@ -130,6 +133,8 @@ export function getCourseWithDetails(id: number) {
       instructorAvatarUrl: users.avatarUrl,
       instructorBio: users.bio,
       categoryName: categories.name,
+      averageRating: sql<number | null>`(SELECT AVG(${courseRatings.rating}) FROM ${courseRatings} WHERE ${courseRatings.courseId} = ${courses.id})`,
+      ratingCount: sql<number>`(SELECT COUNT(*) FROM ${courseRatings} WHERE ${courseRatings.courseId} = ${courses.id})`,
     })
     .from(courses)
     .innerJoin(users, eq(courses.instructorId, users.id))
@@ -165,6 +170,17 @@ export function getCourseWithDetails(id: number) {
       lessons: courseLessons.filter((l) => l.moduleId === mod.id),
     })),
   };
+}
+
+export function getCourseRatingByUser(courseId: number, userId: number) {
+  return db.select().from(courseRatings).where(and(eq(courseRatings.courseId, courseId), eq(courseRatings.userId, userId))).get();
+}
+
+export function saveCourseRating(courseId: number, userId: number, rating: number) {
+  const now = new Date().toISOString();
+  return db.insert(courseRatings).values({ courseId, userId, rating, createdAt: now, updatedAt: now })
+    .onConflictDoUpdate({ target: [courseRatings.userId, courseRatings.courseId], set: { rating, updatedAt: now } })
+    .returning().get();
 }
 
 export function getLessonCountForCourse(courseId: number) {

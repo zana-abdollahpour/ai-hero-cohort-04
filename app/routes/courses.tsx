@@ -15,6 +15,7 @@ import { getUserEnrolledCourses } from "~/services/enrollmentService";
 import { calculateProgress, getCompletedLessonCount } from "~/services/progressService";
 import { resolveCountry } from "~/lib/country.server";
 import { calculatePppPrice } from "~/lib/ppp";
+import { Star } from "lucide-react";
 
 export function meta() {
   return [
@@ -209,6 +210,10 @@ export default function CourseCatalog({ loaderData }: Route.ComponentProps) {
                   <p className="line-clamp-2 text-sm text-muted-foreground">
                     {course.description}
                   </p>
+                  <div className="mt-2 flex items-center gap-1 text-sm text-muted-foreground" aria-label={course.ratingCount ? `Rated ${course.averageRating?.toFixed(1)} out of 5 by ${course.ratingCount} students` : "No ratings yet"}>
+                    <Star className="size-4 fill-amber-400 text-amber-500" />
+                    {course.ratingCount ? <><span className="font-medium text-foreground">{course.averageRating?.toFixed(1)}</span><span>({course.ratingCount})</span></> : <span>No ratings yet</span>}
+                  </div>
                 </CardContent>
                 {course.progress !== null && course.progress > 0 && (
                   <CardContent className="pt-0">

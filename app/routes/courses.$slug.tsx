@@ -1,11 +1,13 @@
 import { useEffect } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Form, Link, useSearchParams, redirect } from "react-router";
 import { toast } from "sonner";
 import type { Route } from "./+types/courses.$slug";
 import {
   getCourseBySlug,
   getCourseWithDetails,
   getLessonCountForCourse,
+  getCourseRatingByUser,
+  saveCourseRating,
 } from "~/services/courseService";
 import { isUserEnrolled } from "~/services/enrollmentService";
 import {
@@ -14,7 +16,8 @@ import {
   getNextIncompleteLesson,
 } from "~/services/progressService";
 import { getCurrentUserId } from "~/lib/session";
-import { LessonProgressStatus } from "~/db/schema";
+import { LessonProgressStatus, UserRole } from "~/db/schema";
+import { getUserById } from "~/services/userService";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -66,6 +69,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const lessonCount = getLessonCountForCourse(course.id);
   const currentUserId = await getCurrentUserId(request);
+  const userRating = currentUserId ? getCourseRatingByUser(course.id, currentUserId)?.rating ?? null : null;
 
   let enrolled = false;
   let progress = 0;
@@ -113,10 +117,26 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     currentUserId,
     pppPrice,
     tierInfo,
+    userRating,
   };
 }
 
-// No action — enrollment is handled via the purchase confirmation page
+export async function action({ request, params }: Route.ActionArgs) {
+  const course = getCourseBySlug(params.slug);
+  if (!course) throw data("Course not found", { status: 404 });
+  const userId = await getCurrentUserId(request);
+  if (!userId) throw data("Sign in to rate this course.", { status: 401 });
+  if (getUserById(userId)?.role !== UserRole.Student || !isUserEnrolled(userId, course.id)) {
+    throw data("Only enrolled students can rate this course.", { status: 403 });
+  }
+  const form = await request.formData();
+  const rating = Number(form.get("rating"));
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    throw data("Choose a rating from 1 to 5 stars.", { status: 400 });
+  }
+  saveCourseRating(course.id, userId, rating);
+  return redirect(`/courses/${course.slug}`);
+}
 
 export function HydrateFallback() {
   return (
@@ -181,6 +201,7 @@ export default function CourseDetail({ loaderData }: Route.ComponentProps) {
     currentUserId,
     pppPrice,
     tierInfo,
+    userRating,
   } = loaderData;
   const isInstructor = currentUserId === course.instructorId;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -302,6 +323,7 @@ export default function CourseDetail({ loaderData }: Route.ComponentProps) {
           {course.description}
         </p>
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <CourseRating average={course.averageRating} count={course.ratingCount} />
           <span className="flex items-center gap-1.5">
             <UserAvatar
               name={course.instructorName}
@@ -321,6 +343,16 @@ export default function CourseDetail({ loaderData }: Route.ComponentProps) {
             </span>
           )}
         </div>
+        {enrolled && currentUserId !== course.instructorId && (
+          <Form method="post" className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium">{userRating ? "Your rating:" : "Rate this course:"}</span>
+            {[1, 2, 3, 4, 5].map((value) => (
+              <button key={value} type="submit" name="rating" value={value} aria-label={`${value} star${value === 1 ? "" : "s"}`} className="text-xl text-amber-500 hover:scale-110 focus-visible:outline focus-visible:outline-2">
+                {value <= (userRating ?? 0) ? "★" : "☆"}
+              </button>
+            ))}
+          </Form>
+        )}
       </div>
 
       {/* Two-column: sales copy left, sidebar right */}
@@ -447,6 +479,15 @@ export default function CourseDetail({ loaderData }: Route.ComponentProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+function CourseRating({ average, count }: { average: number | null; count: number }) {
+  return (
+    <span className="inline-flex items-center gap-1" aria-label={count ? `Rated ${average?.toFixed(1)} out of 5 by ${count} students` : "No ratings yet"}>
+      <span className="text-amber-500">★</span>
+      {count ? <><span className="font-medium text-foreground">{average?.toFixed(1)}</span><span>({count})</span></> : <span>No ratings yet</span>}
+    </span>
   );
 }
 

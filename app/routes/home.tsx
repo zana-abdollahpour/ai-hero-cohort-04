@@ -186,6 +186,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                     <p className="line-clamp-2 text-sm text-muted-foreground">
                       {course.description}
                     </p>
+                    <div className="mt-2 flex items-center gap-1 text-sm text-muted-foreground">
+                      <span className="text-amber-500">★</span>
+                      {course.ratingCount ? <><span className="font-medium text-foreground">{course.averageRating?.toFixed(1)}</span><span>({course.ratingCount})</span></> : <span>No ratings yet</span>}
+                    </div>
                   </CardContent>
                   <CardFooter className="flex items-center justify-between text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
