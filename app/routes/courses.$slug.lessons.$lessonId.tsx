@@ -10,6 +10,15 @@ import { getLessonById } from "~/services/lessonService";
 import { getModuleById } from "~/services/moduleService";
 import { getCurrentUserId } from "~/lib/session";
 import { isUserEnrolled } from "~/services/enrollmentService";
+import { getUserById } from "~/services/userService";
+import {
+  createLessonComment,
+  getCommentById,
+  getCommentsForLesson,
+  restoreLessonComment,
+  softDeleteLessonComment,
+  updateLessonComment,
+} from "~/services/lessonCommentService";
 import {
   getLessonProgress,
   getLessonProgressForCourse,
@@ -26,7 +35,7 @@ import {
   getBestAttempt,
 } from "~/services/quizService";
 import { computeResult } from "~/services/quizScoringService";
-import { LessonProgressStatus } from "~/db/schema";
+import { LessonProgressStatus, UserRole } from "~/db/schema";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import {
@@ -54,7 +63,8 @@ import { z } from "zod";
 import { resolveCountry } from "~/lib/country.server";
 import { checkPppAccess, COUNTRIES } from "~/lib/ppp";
 import { findPurchase } from "~/services/purchaseService";
-import { parseFormData, parseParams } from "~/lib/validation";
+import { parseParams } from "~/lib/validation";
+import { Textarea } from "~/components/ui/textarea";
 
 const lessonParamsSchema = z.object({
   slug: z.string().min(1),
@@ -172,6 +182,33 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     }
   }
 
+  const currentUser = currentUserId ? getUserById(currentUserId) : null;
+  const isCourseInstructor =
+    currentUser?.role === UserRole.Instructor &&
+    course.instructorId === currentUserId;
+  const canAccessComments =
+    currentUser?.role === UserRole.Admin ||
+    isCourseInstructor ||
+    (currentUser?.role === UserRole.Student && enrolled);
+  const comments = canAccessComments
+    ? getCommentsForLesson(lessonId).map((comment) => ({
+        ...comment,
+        content: comment.deletedAt ? null : comment.content,
+        isEdited: comment.updatedAt > comment.createdAt,
+        canEdit: !comment.deletedAt && comment.userId === currentUserId,
+        canDelete:
+          !comment.deletedAt &&
+          (comment.userId === currentUserId ||
+            currentUser?.role === UserRole.Admin ||
+            isCourseInstructor),
+        canRestore:
+          !!comment.deletedAt &&
+          (comment.userId === currentUserId ||
+            currentUser?.role === UserRole.Admin ||
+            isCourseInstructor),
+      }))
+    : [];
+
   // PPP Access Guard
   let pppBlocked = false;
   let pppBlockedCountry: string | null = null;
@@ -271,6 +308,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     lessonStatus,
     enrolled,
     currentUserId,
+    canAccessComments,
+    comments,
     prevLesson,
     nextLesson,
     quiz,
@@ -299,6 +338,84 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   const formData = await request.formData();
   const intent = formData.get("intent");
+
+  if (
+    intent === "create-comment" ||
+    intent === "edit-comment" ||
+    intent === "delete-comment" ||
+    intent === "restore-comment"
+  ) {
+    const lesson = getLessonById(lessonId);
+    const mod = lesson ? getModuleById(lesson.moduleId) : null;
+    if (!lesson || !mod || mod.courseId !== course.id) {
+      throw data("Lesson not found in this course", { status: 404 });
+    }
+
+    const user = getUserById(currentUserId);
+    const isCourseInstructor =
+      user?.role === UserRole.Instructor &&
+      course.instructorId === currentUserId;
+    const isAdmin = user?.role === UserRole.Admin;
+    const isEnrolledStudent =
+      user?.role === UserRole.Student &&
+      isUserEnrolled(currentUserId, course.id);
+    if (!isCourseInstructor && !isAdmin && !isEnrolledStudent) {
+      throw data("You are not allowed to comment on this course", {
+        status: 403,
+      });
+    }
+
+    if (intent === "create-comment") {
+      const content = String(formData.get("content") ?? "").trim();
+      if (!content || content.length > 2000) {
+        return data(
+          { commentError: "Comments must be between 1 and 2,000 characters." },
+          { status: 400 }
+        );
+      }
+      createLessonComment(lessonId, currentUserId, content);
+      return { commentSuccess: true };
+    }
+
+    const commentId = Number(formData.get("commentId"));
+    const comment = Number.isInteger(commentId)
+      ? getCommentById(commentId)
+      : null;
+    if (!comment || comment.lessonId !== lessonId) {
+      throw data("Comment not found", { status: 404 });
+    }
+
+    const canModerate = isCourseInstructor || isAdmin;
+    const isAuthor = comment.userId === currentUserId;
+    if (intent === "edit-comment") {
+      if (!isAuthor || comment.deletedAt) {
+        throw data("You cannot edit this comment", { status: 403 });
+      }
+      const content = String(formData.get("content") ?? "").trim();
+      if (!content || content.length > 2000) {
+        return data(
+          { commentError: "Comments must be between 1 and 2,000 characters." },
+          { status: 400 }
+        );
+      }
+      updateLessonComment(commentId, content);
+      return { commentSuccess: true };
+    }
+
+    if (intent === "delete-comment") {
+      if ((!isAuthor && !canModerate) || comment.deletedAt) {
+        throw data("You cannot delete this comment", { status: 403 });
+      }
+      softDeleteLessonComment(commentId);
+      return { commentSuccess: true };
+    }
+
+    if ((!isAuthor && !canModerate) || !comment.deletedAt) {
+      throw data("You cannot restore this comment", { status: 403 });
+    }
+    restoreLessonComment(commentId);
+    return { commentSuccess: true };
+  }
 
   if (intent === "mark-complete") {
     markLessonComplete(currentUserId, lessonId);
@@ -372,6 +489,8 @@ export default function LessonViewer({ loaderData }: Route.ComponentProps) {
     lessonStatus,
     enrolled,
     currentUserId,
+    canAccessComments,
+    comments,
     prevLesson,
     nextLesson,
     quiz,
@@ -535,6 +654,10 @@ export default function LessonViewer({ loaderData }: Route.ComponentProps) {
             </Card>
           )}
 
+          {canAccessComments && (
+            <LessonComments comments={comments} lessonTitle={lesson.title} />
+          )}
+
           {/* Quiz Section */}
           {quiz && enrolled && currentUserId && (
             <QuizSection
@@ -642,6 +765,196 @@ export default function LessonViewer({ loaderData }: Route.ComponentProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+type LessonCommentView = {
+  id: number;
+  userId: number;
+  content: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  authorName: string;
+  authorRole: string;
+  isEdited: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canRestore: boolean;
+};
+
+function LessonComments({
+  comments,
+  lessonTitle,
+}: {
+  comments: LessonCommentView[];
+  lessonTitle: string;
+}) {
+  const createFetcher = useFetcher();
+  const [content, setContent] = useState("");
+
+  useEffect(() => {
+    if (createFetcher.data?.commentSuccess) setContent("");
+  }, [createFetcher.data]);
+
+  return (
+    <section
+      className="mb-8 border-t pt-8"
+      aria-labelledby="lesson-comments-title"
+    >
+      <div className="mb-5">
+        <h2 id="lesson-comments-title" className="text-2xl font-semibold">
+          Discussion
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Share a question or comment about {lessonTitle}.
+        </p>
+      </div>
+
+      <createFetcher.Form method="post" className="mb-8 space-y-3">
+        <input type="hidden" name="intent" value="create-comment" />
+        <Textarea
+          name="content"
+          aria-label="Your comment"
+          placeholder="Write a comment..."
+          value={content}
+          onChange={(event) => setContent(event.target.value)}
+          maxLength={2000}
+          required
+          rows={4}
+        />
+        {createFetcher.data?.commentError && (
+          <p className="text-sm text-destructive" role="alert">
+            {createFetcher.data.commentError}
+          </p>
+        )}
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            {content.length}/2,000
+          </span>
+          <Button
+            type="submit"
+            disabled={!content.trim() || createFetcher.state !== "idle"}
+          >
+            {createFetcher.state !== "idle" ? "Posting..." : "Post comment"}
+          </Button>
+        </div>
+      </createFetcher.Form>
+
+      {comments.length === 0 ? (
+        <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+          No comments yet. Start the discussion.
+        </p>
+      ) : (
+        <ol className="space-y-4">
+          {comments.map((comment) => (
+            <LessonComment key={comment.id} comment={comment} />
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function LessonComment({ comment }: { comment: LessonCommentView }) {
+  const editFetcher = useFetcher();
+  const deleteFetcher = useFetcher();
+  const restoreFetcher = useFetcher();
+
+  return (
+    <li className="rounded-lg border p-4">
+      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+        <span className="font-medium">{comment.authorName}</span>
+        <span className="rounded bg-muted px-1.5 py-0.5 text-xs capitalize text-muted-foreground">
+          {comment.authorRole}
+        </span>
+        <time
+          className="text-xs text-muted-foreground"
+          dateTime={comment.createdAt}
+        >
+          {comment.createdAt.slice(0, 16).replace("T", " ")} UTC
+        </time>
+        {comment.isEdited && !comment.deletedAt && (
+          <span className="text-xs text-muted-foreground">(edited)</span>
+        )}
+      </div>
+
+      {comment.deletedAt ? (
+        <p className="text-sm italic text-muted-foreground">Comment deleted</p>
+      ) : (
+        <p className="whitespace-pre-wrap break-words text-sm">
+          {comment.content}
+        </p>
+      )}
+
+      {(comment.canEdit || comment.canDelete || comment.canRestore) && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {comment.canEdit && (
+            <details className="group">
+              <summary className="cursor-pointer list-none rounded-md border px-3 py-1.5 text-sm hover:bg-muted">
+                Edit
+              </summary>
+              <editFetcher.Form
+                key={comment.updatedAt}
+                method="post"
+                className="mt-3 space-y-2"
+              >
+                <input type="hidden" name="intent" value="edit-comment" />
+                <input type="hidden" name="commentId" value={comment.id} />
+                <Textarea
+                  name="content"
+                  aria-label="Edit comment"
+                  defaultValue={comment.content ?? ""}
+                  maxLength={2000}
+                  required
+                  rows={3}
+                />
+                {editFetcher.data?.commentError && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {editFetcher.data.commentError}
+                  </p>
+                )}
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={editFetcher.state !== "idle"}
+                >
+                  Save edit
+                </Button>
+              </editFetcher.Form>
+            </details>
+          )}
+          {comment.canDelete && (
+            <deleteFetcher.Form method="post">
+              <input type="hidden" name="intent" value="delete-comment" />
+              <input type="hidden" name="commentId" value={comment.id} />
+              <Button
+                type="submit"
+                variant="outline"
+                size="sm"
+                disabled={deleteFetcher.state !== "idle"}
+              >
+                Delete
+              </Button>
+            </deleteFetcher.Form>
+          )}
+          {comment.canRestore && (
+            <restoreFetcher.Form method="post">
+              <input type="hidden" name="intent" value="restore-comment" />
+              <input type="hidden" name="commentId" value={comment.id} />
+              <Button
+                type="submit"
+                variant="outline"
+                size="sm"
+                disabled={restoreFetcher.state !== "idle"}
+              >
+                Restore comment
+              </Button>
+            </restoreFetcher.Form>
+          )}
+        </div>
+      )}
+    </li>
   );
 }
 
