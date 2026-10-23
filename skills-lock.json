@@ -205,6 +205,12 @@
       "skillPath": "skills/engineering/wizard/SKILL.md",
       "computedHash": "c8fffad2f165f6c34e415ee291f9f8a9f1ef8cdea1b15b4f0034f615f49d8827"
     },
+    "write-a-skill": {
+      "source": "theomonfort/skills",
+      "sourceType": "github",
+      "skillPath": "skills/write-a-skill/SKILL.md",
+      "computedHash": "09884e8ef809885829fe979292f5c4d57055da331e0cf9adf0497640dde3c726"
+    },
     "writing-beats": {
       "source": "mattpocock/skills",
       "sourceType": "github",
