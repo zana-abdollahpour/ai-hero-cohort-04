@@ -19,15 +19,7 @@ Give instructors a private, mobile-friendly view of purchase activity and curren
 
 ## Phases
 
-### Phase 0 — Finish delivery setup
-
-1. Complete GitHub CLI device authentication for the selected repository.
-2. Create any missing default triage labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`.
-3. Publish the prepared instructor analytics spec as a GitHub issue with the `ready-for-agent` label.
-
-**Exit:** The issue is available in GitHub and the repository labels match `docs/agents/triage-labels.md`.
-
-### Phase 1 — Establish the analytics read model
+### Phase 0 — Establish the analytics read model
 
 1. Confirm query definitions for purchase counts, current enrollments, current completion, and lesson progression against the existing schema and data services.
 2. Aggregate only data belonging to the authenticated instructor’s owned courses; include inactive owned courses.
@@ -37,7 +29,7 @@ Give instructors a private, mobile-friendly view of purchase activity and curren
 
 **Exit:** The dashboard loader can return a typed, instructor-scoped view model with correct metric values, period context, data timestamp, and flags.
 
-### Phase 2 — Add the protected dashboard data route
+### Phase 1 — Add the protected dashboard data route
 
 1. Extend the existing instructor dashboard flow with analytics data and course/date filter inputs.
 2. Require an authenticated Instructor role and validate ownership for every requested course. Reject unauthorized course IDs without returning their analytics.
@@ -46,7 +38,7 @@ Give instructors a private, mobile-friendly view of purchase activity and curren
 
 **Exit:** The route loader returns the intended analytics for authorized instructors and denies unauthenticated, wrong-role, and cross-owner access.
 
-### Phase 3 — Build the dashboard interface
+### Phase 2 — Build the dashboard interface
 
 1. Add overview cards for purchase count, current enrollments, and completion rate with numerator and denominator.
 2. Add a course filter that includes owned courses with historical data and a purchase date-range selector defaulted to 30 days.
@@ -57,7 +49,7 @@ Give instructors a private, mobile-friendly view of purchase activity and curren
 
 **Exit:** Instructors can use the overview on desktop and mobile, and every displayed value is understandable without inferring an unstated date scope.
 
-### Phase 4 — Add and verify evidence-based flags
+### Phase 3 — Add and verify evidence-based flags
 
 1. Show a purchase decline flag only when the previous-period minimum count and decline threshold are met.
 2. Show lesson drop-off flags only when the reached-learner minimum and drop-off threshold are met.
@@ -66,7 +58,7 @@ Give instructors a private, mobile-friendly view of purchase activity and curren
 
 **Exit:** Flags are actionable, repeatable from data, dismissible, and do not appear for undersized groups.
 
-### Phase 5 — Verify behavior and release
+### Phase 4 — Verify behavior and release
 
 1. Test the instructor analytics route loader through its external interface using the existing in-memory SQLite setup and real data modules.
 2. Cover role and ownership access, inactive owned courses, date filtering and comparison, current enrollment/completion definitions, lesson ordering and drop-off, small cohorts, empty data, flag lifecycle, and update metadata.

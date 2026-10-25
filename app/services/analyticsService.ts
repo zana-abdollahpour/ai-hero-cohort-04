@@ -27,6 +27,42 @@ type Flag = {
   lessonId: number | null;
 };
 
+export type InstructorAnalyticsViewModel = {
+  courses: Array<{ id: number; title: string; slug: string; status: CourseStatus }>;
+  selectedCourseId: number | null;
+  period: {
+    days: number;
+    start: string;
+    end: string;
+    previousStart: string;
+    previousEnd: string;
+  };
+  purchases: {
+    count: number;
+    previousCount: number;
+    trend: Array<{ date: string; count: number }>;
+  };
+  learning: {
+    enrollments: number;
+    completions: number;
+    completionRate: number | null;
+    lessons: Array<{
+      lessonId: number;
+      title: string;
+      reached: number;
+      progressed: number | null;
+      dropoff: number | null;
+      courseId: number;
+      courseTitle: string;
+      reachedRate: number | null;
+      progressionRate: number | null;
+    }>;
+  };
+  flags: Array<Flag & { courseSlug: string; courseTitle: string }>;
+  updatedAt: string;
+  thresholds: { smallCohort: number };
+};
+
 function startOfDay(date: Date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
@@ -37,8 +73,8 @@ function ratio(numerator: number, denominator: number) {
 
 export function getInstructorAnalytics(
   instructorId: number,
-  options: { courseId: number | null; days: number; now?: Date }
-) {
+  options: { courseId: number | null; days: number; now?: Date },
+): InstructorAnalyticsViewModel | null {
   const now = options.now ?? new Date();
   const end = startOfDay(now);
   end.setUTCDate(end.getUTCDate() + 1);
