@@ -231,7 +231,7 @@ export function getInstructorAnalytics(
         ...lesson,
         courseId: course.course.id,
         courseTitle: course.course.title,
-        reachedRate: lesson.reached >= SMALL_COHORT ? lesson.rate : null,
+        reachedRate: course.enrollments >= SMALL_COHORT ? lesson.rate : null,
         progressionRate: lesson.reached >= SMALL_COHORT && lesson.progressed !== null ? ratio(lesson.progressed, lesson.reached) : null,
       }))),
     },

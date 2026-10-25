@@ -81,6 +81,13 @@ describe("instructor analytics route", () => {
       .rejects.toMatchObject({ init: { status: 404 } });
   });
 
+  it("suppresses purchase decline flags when the previous period has fewer than five purchases", async () => {
+    addPurchases(base.course.id, -35, 4);
+    const { analytics } = await loader(routeArgs(await requestFor(base.instructor.id))) as { analytics: any };
+    expect(analytics.purchases.previousCount).toBe(4);
+    expect(analytics.flags.some((flag: any) => flag.kind === "purchase_decline")).toBe(false);
+  });
+
   it("includes inactive owned courses and compares purchase windows while keeping learning metrics current", async () => {
     testDb.update(schema.courses).set({ status: schema.CourseStatus.Archived }).where(eq(schema.courses.id, base.course.id)).run();
     addPurchases(base.course.id, -10, 5);
@@ -109,14 +116,14 @@ describe("instructor analytics route", () => {
     const moduleFirst = testDb.insert(schema.modules).values({ courseId: base.course.id, title: "First", position: 1 }).returning().get();
     const laterLesson = testDb.insert(schema.lessons).values({ moduleId: moduleLater.id, title: "Lesson B", position: 1 }).returning().get();
     const firstLesson = testDb.insert(schema.lessons).values({ moduleId: moduleFirst.id, title: "Lesson A", position: 1 }).returning().get();
-    const learners = Array.from({ length: 4 }, (_, index) => testDb.insert(schema.users).values({
+    const learners = Array.from({ length: 10 }, (_, index) => testDb.insert(schema.users).values({
       name: `Learner ${index}`,
       email: `learner-${index}@example.com`,
       role: schema.UserRole.Student,
     }).returning().get());
     learners.forEach((learner, index) => {
       testDb.insert(schema.enrollments).values({ userId: learner.id, courseId: base.course.id }).run();
-      testDb.insert(schema.lessonProgress).values({
+      if (index < 4) testDb.insert(schema.lessonProgress).values({
         userId: learner.id,
         lessonId: firstLesson.id,
         status: schema.LessonProgressStatus.InProgress,
@@ -130,7 +137,8 @@ describe("instructor analytics route", () => {
 
     const { analytics } = await loader(routeArgs(await requestFor(base.instructor.id))) as { analytics: any };
     expect(analytics.learning.lessons.map((lesson: any) => lesson.title)).toEqual(["Lesson A", "Lesson B"]);
-    expect(analytics.learning.lessons[0]).toMatchObject({ reached: 4, progressed: 2, reachedRate: null, progressionRate: null });
+    expect(analytics.learning.lessons[0]).toMatchObject({ reached: 4, progressed: 2, reachedRate: 0.4, progressionRate: null });
+    expect(analytics.learning.lessons[1].reachedRate).toBe(0.2);
     expect(analytics.flags).toHaveLength(0);
   });
 
@@ -166,6 +174,14 @@ describe("instructor analytics route", () => {
     expect(actionResult).toEqual({ success: true });
     response = await loader(routeArgs(await requestFor(base.instructor.id))) as { analytics: any };
     expect(response.analytics.flags.some((flag: any) => flag.kind === "purchase_decline")).toBe(false);
+    const dismissLessonForm = new URLSearchParams({ intent: "dismiss-flag", courseId: String(base.course.id), key: `lesson:${first.id}`, days: "30" });
+    await action(routeArgs(new Request(dismissRequest.url, {
+      method: "POST",
+      headers: { Cookie: dismissRequest.headers.get("Cookie") ?? "", "Content-Type": "application/x-www-form-urlencoded" },
+      body: dismissLessonForm,
+    })));
+    response = await loader(routeArgs(await requestFor(base.instructor.id))) as { analytics: any };
+    expect(response.analytics.flags.some((flag: any) => flag.kind === "lesson_dropoff")).toBe(false);
 
     const selectedPurchases = testDb.select({ id: schema.purchases.id, createdAt: schema.purchases.createdAt })
       .from(schema.purchases).where(eq(schema.purchases.courseId, base.course.id)).all()
