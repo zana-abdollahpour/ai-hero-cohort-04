@@ -28,11 +28,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   const rawCourseId = url.searchParams.get("course");
   const courseId = rawCourseId === null || rawCourseId === "all" ? null : Number(rawCourseId);
   if (courseId !== null && (!Number.isInteger(courseId) || courseId < 1)) throw data("Invalid course filter.", { status: 400 });
-  const rawDays = Number(url.searchParams.get("days") ?? 30);
-  const days = allowedRanges.includes(rawDays) ? rawDays : 30;
+  const rawDays = url.searchParams.get("days");
+  const days = rawDays === null ? 30 : Number(rawDays);
+  if (!allowedRanges.includes(days)) throw data("Invalid purchase range.", { status: 400 });
   const analytics = getInstructorAnalytics(instructorId, { courseId, days });
-  if (courseId !== null && analytics === null) throw data("Course not found in your instructor account.", { status: 404 });
-  return { analytics: analytics!, courseFilter: courseId === null ? "all" : String(courseId), days };
+  if (analytics === null) throw data("Course not found in your instructor account.", { status: 404 });
+  return { analytics, courseFilter: courseId === null ? "all" : String(courseId), days };
 }
 
 export async function action({ request }: Route.ActionArgs) {

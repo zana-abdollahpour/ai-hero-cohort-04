@@ -108,6 +108,7 @@ export function getInstructorAnalytics(
     const moduleRows = db.select({ id: modules.id, position: modules.position })
       .from(modules).where(eq(modules.courseId, course.id)).orderBy(modules.position).all();
     const moduleIds = moduleRows.map((module) => module.id);
+    const modulePositionById = new Map(moduleRows.map((module) => [module.id, module.position]));
     const lessonRows = moduleIds.length === 0 ? [] : db.select({
       id: lessons.id,
       title: lessons.title,
@@ -115,9 +116,8 @@ export function getInstructorAnalytics(
       moduleId: lessons.moduleId,
     }).from(lessons).where(inArray(lessons.moduleId, moduleIds)).all();
     const orderedLessons = lessonRows.sort((a, b) => {
-      const modulePositionA = moduleRows.find((module) => module.id === a.moduleId)?.position ?? 0;
-      const modulePositionB = moduleRows.find((module) => module.id === b.moduleId)?.position ?? 0;
-      return modulePositionA - modulePositionB || a.position - b.position;
+      const modulePositionDifference = (modulePositionById.get(a.moduleId) ?? 0) - (modulePositionById.get(b.moduleId) ?? 0);
+      return modulePositionDifference || a.moduleId - b.moduleId || a.position - b.position || a.id - b.id;
     });
     const currentEnrollments = db.select({ userId: enrollments.userId, completedAt: enrollments.completedAt })
       .from(enrollments).where(eq(enrollments.courseId, course.id)).all();
@@ -128,11 +128,12 @@ export function getInstructorAnalytics(
       status: lessonProgress.status,
     }).from(lessonProgress).where(inArray(lessonProgress.lessonId, orderedLessons.map((lesson) => lesson.id))).all()
       .filter((progress) => enrolledUserIds.has(progress.userId));
-    const progressByUserAndLesson = new Map(progressRows.map((progress) => [`${progress.userId}:${progress.lessonId}`, progress.status]));
+    const reachedLessonKeys = new Set(progressRows
+      .filter((progress) => progress.status === LessonProgressStatus.InProgress || progress.status === LessonProgressStatus.Completed)
+      .map((progress) => `${progress.userId}:${progress.lessonId}`));
     const reachedByLesson = orderedLessons.map((lesson) => {
       const reached = currentEnrollments.filter((enrollment) => {
-        const status = progressByUserAndLesson.get(`${enrollment.userId}:${lesson.id}`);
-        return status === LessonProgressStatus.InProgress || status === LessonProgressStatus.Completed;
+        return reachedLessonKeys.has(`${enrollment.userId}:${lesson.id}`);
       }).length;
       return { lessonId: lesson.id, title: lesson.title, reached, rate: ratio(reached, currentEnrollments.length) };
     });
