@@ -141,12 +141,15 @@ export default function InstructorDashboard({
             Manage your courses and track enrollments
           </p>
         </div>
-        <Link to="/instructor/new">
-          <Button>
-            <Plus className="mr-2 size-4" />
-            New Course
-          </Button>
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link to="/instructor/analytics"><Button variant="outline">Analytics</Button></Link>
+          <Link to="/instructor/new">
+            <Button>
+              <Plus className="mr-2 size-4" />
+              New Course
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {courses.length === 0 ? (

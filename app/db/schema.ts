@@ -280,3 +280,13 @@ export const videoWatchEvents = sqliteTable("video_watch_events", {
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
 });
+
+export const analyticsFlagDismissals = sqliteTable("analytics_flag_dismissals", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  instructorId: integer("instructor_id").notNull().references(() => users.id),
+  courseId: integer("course_id").notNull().references(() => courses.id),
+  flagKey: text("flag_key").notNull(),
+  dismissedValue: real("dismissed_value").notNull(),
+  dismissedAt: text("dismissed_at").notNull(),
+  clearedAt: text("cleared_at"),
+}, (table) => [uniqueIndex("analytics_flag_dismissals_owner_course_key_unique").on(table.instructorId, table.courseId, table.flagKey)]);
