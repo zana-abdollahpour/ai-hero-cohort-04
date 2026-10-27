@@ -1,4 +1,4 @@
-import { NavLink, Form } from "react-router";
+import { NavLink, Form, type NavLinkRenderProps } from "react-router";
 import { useState, useEffect } from "react";
 import { cn } from "~/lib/utils";
 import { UserRole } from "~/db/schema";
@@ -142,7 +142,7 @@ export function Sidebar({
               to={item.to}
               aria-label={item.label}
               title={item.label}
-              className={({ isActive }) =>
+              className={({ isActive }: NavLinkRenderProps) =>
                 cn(
                   "relative flex items-center justify-center gap-3 rounded-md px-1 py-2 text-sm font-medium transition-colors sm:justify-start sm:px-3",
                   isActive
@@ -167,7 +167,7 @@ export function Sidebar({
             to="/team"
             aria-label="Team"
             title="Team"
-            className={({ isActive }) =>
+            className={({ isActive }: NavLinkRenderProps) =>
               cn(
                 "flex items-center justify-center gap-3 rounded-md px-1 py-2 text-sm font-medium transition-colors sm:justify-start sm:px-3",
                 isActive
@@ -192,7 +192,7 @@ export function Sidebar({
               <NavLink
                 key={course.courseId}
                 to={`/courses/${course.slug}`}
-                className={({ isActive }) =>
+                className={({ isActive }: NavLinkRenderProps) =>
                   cn(
                     "block rounded-md px-3 py-2 transition-colors",
                     isActive

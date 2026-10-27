@@ -46,6 +46,7 @@ import {
   DragDropContext,
   Droppable,
   Draggable,
+  type DroppableProvided,
   type DropResult,
 } from "@hello-pangea/dnd";
 import { data, isRouteErrorResponse } from "react-router";
@@ -135,8 +136,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   }
 
   const user = getUserById(currentUserId);
-  if (!user || (user.role !== UserRole.Instructor && user.role !== UserRole.Admin)) {
-    throw data("Only instructors and admins can access this page.", { status: 403 });
+  if (
+    !user ||
+    (user.role !== UserRole.Instructor && user.role !== UserRole.Admin)
+  ) {
+    throw data("Only instructors and admins can access this page.", {
+      status: 403,
+    });
   }
 
   const courseId = parseInt(params.courseId, 10);
@@ -187,14 +193,22 @@ export async function action({ params, request }: Route.ActionArgs) {
   }
 
   const user = getUserById(currentUserId);
-  if (!user || (user.role !== UserRole.Instructor && user.role !== UserRole.Admin)) {
-    throw data("Only instructors and admins can manage quizzes.", { status: 403 });
+  if (
+    !user ||
+    (user.role !== UserRole.Instructor && user.role !== UserRole.Admin)
+  ) {
+    throw data("Only instructors and admins can manage quizzes.", {
+      status: 403,
+    });
   }
 
   const { courseId, lessonId } = parseParams(params, quizParamsSchema);
 
   const course = getCourseById(courseId);
-  if (!course || (course.instructorId !== currentUserId && user.role !== UserRole.Admin)) {
+  if (
+    !course ||
+    (course.instructorId !== currentUserId && user.role !== UserRole.Admin)
+  ) {
     throw data("Course not found or not yours.", { status: 403 });
   }
 
@@ -212,7 +226,10 @@ export async function action({ params, request }: Route.ActionArgs) {
   const parsed = parseFormData(formData, quizActionSchema);
 
   if (!parsed.success) {
-    return data({ error: Object.values(parsed.errors)[0] ?? "Invalid input." }, { status: 400 });
+    return data(
+      { error: Object.values(parsed.errors)[0] ?? "Invalid input." },
+      { status: 400 }
+    );
   }
 
   const { intent } = parsed.data;
@@ -246,12 +263,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     // Create questions and options
     for (let qi = 0; qi < wizardData.questions.length; qi++) {
       const q = wizardData.questions[qi];
-      const question = createQuestion(
-        quiz.id,
-        q.text.trim(),
-        q.type,
-        qi + 1
-      );
+      const question = createQuestion(quiz.id, q.text.trim(), q.type, qi + 1);
 
       for (const opt of q.options) {
         createOption(question.id, opt.text.trim(), opt.isCorrect);
@@ -310,9 +322,7 @@ function StepIndicator({
             )}
             {step.label}
           </button>
-          {i < STEPS.length - 1 && (
-            <div className="mx-2 h-px w-8 bg-border" />
-          )}
+          {i < STEPS.length - 1 && <div className="mx-2 h-px w-8 bg-border" />}
         </div>
       ))}
     </div>
@@ -510,18 +520,14 @@ export default function QuizBuilderWizard({
 
             <DragDropContext onDragEnd={handleQuestionDragEnd}>
               <Droppable droppableId="quiz-questions" type="question">
-                {(provided) => (
+                {(provided: DroppableProvided) => (
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
                     className="space-y-4"
                   >
                     {wizard.questions.map((q, idx) => (
-                      <Draggable
-                        key={q.id}
-                        draggableId={q.id}
-                        index={idx}
-                      >
+                      <Draggable key={q.id} draggableId={q.id} index={idx}>
                         {(dragProvided, snapshot) => (
                           <div
                             ref={dragProvided.innerRef}
@@ -572,9 +578,7 @@ export default function QuizBuilderWizard({
                                     >
                                       Multiple Choice
                                     </SelectItem>
-                                    <SelectItem
-                                      value={QuestionType.TrueFalse}
-                                    >
+                                    <SelectItem value={QuestionType.TrueFalse}>
                                       True / False
                                     </SelectItem>
                                   </SelectContent>
@@ -681,8 +685,7 @@ export default function QuizBuilderWizard({
           <CardHeader>
             <h2 className="text-lg font-semibold">Answer Options</h2>
             <p className="text-sm text-muted-foreground">
-              Set answer options for each question and mark the correct
-              answer.
+              Set answer options for each question and mark the correct answer.
             </p>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -813,7 +816,8 @@ export default function QuizBuilderWizard({
             <div className="rounded-lg bg-muted/50 p-4">
               <div className="space-y-1 text-sm">
                 <div>
-                  <span className="font-medium">Title:</span> {wizard.title || "(empty)"}
+                  <span className="font-medium">Title:</span>{" "}
+                  {wizard.title || "(empty)"}
                 </div>
                 <div>
                   <span className="font-medium">Passing Score:</span>{" "}
@@ -844,14 +848,19 @@ export default function QuizBuilderWizard({
                 </div>
                 <div className="ml-8 space-y-1">
                   {q.options.map((opt) => (
-                    <div key={opt.id} className="flex items-center gap-2 text-sm">
+                    <div
+                      key={opt.id}
+                      className="flex items-center gap-2 text-sm"
+                    >
                       {opt.isCorrect ? (
                         <CheckCircle2 className="size-4 text-green-500" />
                       ) : (
                         <XCircle className="size-4 text-muted-foreground/40" />
                       )}
                       <span
-                        className={opt.isCorrect ? "font-medium text-green-700" : ""}
+                        className={
+                          opt.isCorrect ? "font-medium text-green-700" : ""
+                        }
                       >
                         {opt.text || "(empty)"}
                       </span>
@@ -925,10 +934,7 @@ export default function QuizBuilderWizard({
           My Courses
         </Link>
         <span className="mx-2">/</span>
-        <Link
-          to={`/instructor/${course.id}`}
-          className="hover:text-foreground"
-        >
+        <Link to={`/instructor/${course.id}`} className="hover:text-foreground">
           {course.title}
         </Link>
         <span className="mx-2">/</span>
@@ -971,10 +977,7 @@ export default function QuizBuilderWizard({
                   "Are you sure you want to delete this quiz? All student attempts will be lost."
                 )
               ) {
-                fetcher.submit(
-                  { intent: "delete-quiz" },
-                  { method: "post" }
-                );
+                fetcher.submit({ intent: "delete-quiz" }, { method: "post" });
               }
             }}
           >
@@ -1024,10 +1027,16 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       message = "The quiz, lesson, or course you're looking for doesn't exist.";
     } else if (error.status === 401) {
       title = "Sign in required";
-      message = typeof error.data === "string" ? error.data : "Please select a user from the DevUI panel.";
+      message =
+        typeof error.data === "string"
+          ? error.data
+          : "Please select a user from the DevUI panel.";
     } else if (error.status === 403) {
       title = "Access denied";
-      message = typeof error.data === "string" ? error.data : "You don't have permission to access this page.";
+      message =
+        typeof error.data === "string"
+          ? error.data
+          : "You don't have permission to access this page.";
     } else {
       title = `Error ${error.status}`;
       message = typeof error.data === "string" ? error.data : error.statusText;
