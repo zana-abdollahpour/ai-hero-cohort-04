@@ -11,6 +11,7 @@ import {
   Tag,
   Users,
   UsersRound,
+  Bell,
   Moon,
   Sun,
   LogOut,
@@ -38,6 +39,7 @@ interface SidebarProps {
   currentUser: CurrentUser | null;
   recentCourses?: RecentCourse[];
   isTeamAdmin?: boolean;
+  unreadNotificationCount?: number;
 }
 
 interface NavItem {
@@ -45,6 +47,7 @@ interface NavItem {
   to: string;
   icon: React.ReactNode;
   roles: UserRole[] | "all";
+  showUnreadCount?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -65,6 +68,13 @@ const navItems: NavItem[] = [
     to: "/instructor",
     icon: <GraduationCap className="size-4" />,
     roles: [UserRole.Instructor],
+  },
+  {
+    label: "Notifications",
+    to: "/instructor/notifications",
+    icon: <Bell className="size-4" />,
+    roles: [UserRole.Instructor],
+    showUnreadCount: true,
   },
   {
     label: "Manage Users",
@@ -96,6 +106,7 @@ export function Sidebar({
   currentUser,
   recentCourses = [],
   isTeamAdmin = false,
+  unreadNotificationCount = 0,
 }: SidebarProps) {
   const currentUserRole = currentUser?.role ?? null;
   const [isDark, setIsDark] = useState(false);
@@ -114,23 +125,26 @@ export function Sidebar({
   }
 
   return (
-    <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-      <div className="flex h-14 items-center border-b border-sidebar-border px-4">
+    <aside className="flex h-screen w-14 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground sm:w-56">
+      <div className="flex h-14 items-center justify-center border-b border-sidebar-border px-2 sm:justify-start sm:px-4">
         <NavLink to="/" className="text-lg font-bold tracking-tight">
-          Cadence
+          <span className="sm:hidden">C</span>
+          <span className="hidden sm:inline">Cadence</span>
         </NavLink>
       </div>
 
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="flex-1 space-y-1 p-1 sm:p-3">
         {navItems
           .filter((item) => isVisible(item, currentUserRole))
           .map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
+              aria-label={item.label}
+              title={item.label}
               className={({ isActive }) =>
                 cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  "relative flex items-center justify-center gap-3 rounded-md px-1 py-2 text-sm font-medium transition-colors sm:justify-start sm:px-3",
                   isActive
                     ? "bg-sidebar-accent text-sidebar-accent-foreground"
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -138,15 +152,24 @@ export function Sidebar({
               }
             >
               {item.icon}
-              {item.label}
+              <span className="hidden sm:inline">{item.label}</span>
+              {item.showUnreadCount && unreadNotificationCount > 0 && (
+                <span className="absolute right-0 top-0 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-foreground sm:static sm:ml-auto sm:px-2 sm:text-xs sm:leading-normal">
+                  {unreadNotificationCount > 99
+                    ? "99+"
+                    : unreadNotificationCount}
+                </span>
+              )}
             </NavLink>
           ))}
         {isTeamAdmin && (
           <NavLink
             to="/team"
+            aria-label="Team"
+            title="Team"
             className={({ isActive }) =>
               cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center justify-center gap-3 rounded-md px-1 py-2 text-sm font-medium transition-colors sm:justify-start sm:px-3",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -154,13 +177,13 @@ export function Sidebar({
             }
           >
             <UsersRound className="size-4" />
-            Team
+            <span className="hidden sm:inline">Team</span>
           </NavLink>
         )}
       </nav>
 
       {recentCourses.length > 0 && (
-        <div className="border-t border-sidebar-border p-3">
+        <div className="hidden border-t border-sidebar-border p-3 sm:block">
           <div className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
             Recent Courses
           </div>
@@ -198,22 +221,25 @@ export function Sidebar({
         </div>
       )}
 
-      <div className="border-t border-sidebar-border p-3 space-y-1">
+      <div className="space-y-1 border-t border-sidebar-border p-1 sm:p-3">
         <button
           onClick={toggleDarkMode}
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          title={isDark ? "Light Mode" : "Dark Mode"}
+          className="flex w-full items-center justify-center gap-3 rounded-md px-1 py-2 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground sm:justify-start sm:px-3"
         >
           {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-          {isDark ? "Light Mode" : "Dark Mode"}
+          <span className="hidden sm:inline">
+            {isDark ? "Light Mode" : "Dark Mode"}
+          </span>
         </button>
 
         {currentUser && (
-          <div className="flex items-center gap-3 rounded-md px-3 py-2">
+          <div className="flex items-center justify-center gap-3 rounded-md px-1 py-2 sm:justify-start sm:px-3">
             <UserAvatar
               name={currentUser.name}
               avatarUrl={currentUser.avatarUrl}
             />
-            <div className="flex-1 min-w-0">
+            <div className="hidden min-w-0 flex-1 sm:block">
               <div className="truncate text-sm font-medium">
                 {currentUser.name}
               </div>
@@ -224,6 +250,7 @@ export function Sidebar({
             <NavLink
               to="/settings"
               title="Settings"
+              aria-label="Settings"
               className="rounded-md p-1 text-sidebar-foreground/50 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             >
               <Settings className="size-4" />
@@ -232,6 +259,7 @@ export function Sidebar({
               <button
                 type="submit"
                 title="Sign out"
+                aria-label="Sign out"
                 className="rounded-md p-1 text-sidebar-foreground/50 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               >
                 <LogOut className="size-4" />

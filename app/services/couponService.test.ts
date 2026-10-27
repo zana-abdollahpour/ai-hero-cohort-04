@@ -18,6 +18,7 @@ import {
   getCouponsForTeam,
   redeemCoupon,
 } from "./couponService";
+import { getInstructorNotifications } from "./instructorNotificationService";
 
 // Helper: create a team with admin and a purchase for coupon generation
 function setupTeamAndPurchase(country: string | null = "US") {
@@ -179,6 +180,15 @@ describe("couponService", () => {
       if (result.ok) {
         expect(result.enrollment.userId).toBe(redeemer.id);
         expect(result.enrollment.courseId).toBe(base.course.id);
+        expect(getInstructorNotifications(base.instructor.id)).toMatchObject([
+          {
+            learnerId: redeemer.id,
+            courseId: base.course.id,
+            learnerName: redeemer.name,
+            courseTitle: base.course.title,
+            readAt: null,
+          },
+        ]);
       }
 
       // Verify coupon is marked as redeemed
@@ -244,6 +254,7 @@ describe("couponService", () => {
       // Verify coupon is NOT consumed
       const unchanged = getCouponByCode(coupon.code);
       expect(unchanged!.redeemedByUserId).toBeNull();
+      expect(getInstructorNotifications(base.instructor.id)).toHaveLength(0);
     });
 
     it("rejects redemption from a different country", () => {
@@ -263,6 +274,7 @@ describe("couponService", () => {
       // Verify coupon is NOT consumed
       const unchanged = getCouponByCode(coupon.code);
       expect(unchanged!.redeemedByUserId).toBeNull();
+      expect(getInstructorNotifications(base.instructor.id)).toHaveLength(0);
     });
 
     it("allows redemption when purchase has no country set", () => {

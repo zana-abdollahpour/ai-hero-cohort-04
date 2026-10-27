@@ -1,4 +1,11 @@
-import { sqliteTable, text, integer, real, uniqueIndex } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  real,
+  uniqueIndex,
+  index,
+} from "drizzle-orm/sqlite-core";
 
 export enum UserRole {
   Student = "student",
@@ -134,14 +141,67 @@ export const enrollments = sqliteTable("enrollments", {
   completedAt: text("completed_at"),
 });
 
-export const courseRatings = sqliteTable("course_ratings", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: integer("user_id").notNull().references(() => users.id),
-  courseId: integer("course_id").notNull().references(() => courses.id),
-  rating: integer("rating").notNull(),
-  createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
-  updatedAt: text("updated_at").notNull().$defaultFn(() => new Date().toISOString()),
-}, (table) => [uniqueIndex("course_ratings_user_course_unique").on(table.userId, table.courseId)]);
+export const instructorNotifications = sqliteTable(
+  "instructor_notifications",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    instructorId: integer("instructor_id")
+      .notNull()
+      .references(() => users.id),
+    learnerId: integer("learner_id")
+      .notNull()
+      .references(() => users.id),
+    courseId: integer("course_id")
+      .notNull()
+      .references(() => courses.id),
+    enrollmentId: integer("enrollment_id").references(() => enrollments.id, {
+      onDelete: "set null",
+    }),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    readAt: text("read_at"),
+  },
+  (table) => [
+    uniqueIndex("instructor_notifications_enrollment_unique").on(
+      table.enrollmentId
+    ),
+    index("instructor_notifications_recipient_created_at_idx").on(
+      table.instructorId,
+      table.createdAt
+    ),
+    index("instructor_notifications_recipient_read_at_idx").on(
+      table.instructorId,
+      table.readAt
+    ),
+  ]
+);
+
+export const courseRatings = sqliteTable(
+  "course_ratings",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    courseId: integer("course_id")
+      .notNull()
+      .references(() => courses.id),
+    rating: integer("rating").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+    updatedAt: text("updated_at")
+      .notNull()
+      .$defaultFn(() => new Date().toISOString()),
+  },
+  (table) => [
+    uniqueIndex("course_ratings_user_course_unique").on(
+      table.userId,
+      table.courseId
+    ),
+  ]
+);
 
 export const lessonProgress = sqliteTable("lesson_progress", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -281,12 +341,26 @@ export const videoWatchEvents = sqliteTable("video_watch_events", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
-export const analyticsFlagDismissals = sqliteTable("analytics_flag_dismissals", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  instructorId: integer("instructor_id").notNull().references(() => users.id),
-  courseId: integer("course_id").notNull().references(() => courses.id),
-  flagKey: text("flag_key").notNull(),
-  dismissedValue: real("dismissed_value").notNull(),
-  dismissedAt: text("dismissed_at").notNull(),
-  clearedAt: text("cleared_at"),
-}, (table) => [uniqueIndex("analytics_flag_dismissals_owner_course_key_unique").on(table.instructorId, table.courseId, table.flagKey)]);
+export const analyticsFlagDismissals = sqliteTable(
+  "analytics_flag_dismissals",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    instructorId: integer("instructor_id")
+      .notNull()
+      .references(() => users.id),
+    courseId: integer("course_id")
+      .notNull()
+      .references(() => courses.id),
+    flagKey: text("flag_key").notNull(),
+    dismissedValue: real("dismissed_value").notNull(),
+    dismissedAt: text("dismissed_at").notNull(),
+    clearedAt: text("cleared_at"),
+  },
+  (table) => [
+    uniqueIndex("analytics_flag_dismissals_owner_course_key_unique").on(
+      table.instructorId,
+      table.courseId,
+      table.flagKey
+    ),
+  ]
+);
