@@ -12,7 +12,7 @@ Complete one scoped unit of repository work from plan through commit.
 
 1. **Plan.** (optional) Read the relevant code and repository guidance. State a short plan with the files or behavior affected and how you will verify it. For ambiguous requirements, inspect available context and make the smallest reasonable assumption; ask only when a decision blocks correct implementation.
 
-2. **Implement.** Make the smallest coherent change that satisfies the request. Follow nearby patterns and keep the change focused on the planned work.
+2. **Implement.** Make the smallest coherent change that satisfies the request. Follow nearby patterns and keep the change focused on the planned work. For backend code, work in small tracer-bullet steps: choose one thin, end-to-end slice, then complete its red-green-refactor cycle before starting the next slice. Add or update a focused test that captures the behavior (red), make the minimum implementation to pass it (green), then simplify the code while keeping the test passing (refactor). Keep each step reviewable and runnable. This red-green-refactor sequence applies only to backend implementation; do not impose it on frontend code.
 
 3. **Get feedback.** Run `pnpm run typecheck` and `pnpm run test`. Treat compiler and test output as feedback: fix issues in the change and rerun the failing command(s). Repeat until both commands pass. If a command cannot run, report the concrete blocker and its impact; do not claim it passed.
 
